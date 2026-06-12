@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Monitoring Curah Hujan</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        /* CSS Untuk Layout Dashboard Modern */
+        :root {
+            --primary-bg: #1e1e2f;
+            --sidebar-bg: #27293d;
+            --text-color: #ffffff;
+            --text-muted: #9a9a9a;
+            --accent-color: #00f2c3;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            height: 100vh;
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+            overflow: hidden;
+        }
+
+        /* 1. Desain Sidebar Kiri */
+        .sidebar {
+            width: 280px;
+            background-color: var(--sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .sidebar-header h2 {
+            margin: 0;
+            font-size: 18px;
+            color: var(--accent-color);
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 20px 0;
+            margin: 0;
+        }
+
+        .sidebar-menu li {
+            padding: 15px 25px;
+            cursor: pointer;
+            transition: 0.3s;
+            border-left: 4px solid transparent;
+        }
+
+        .sidebar-menu li:hover, .sidebar-menu li.active {
+            background-color: rgba(255,255,255,0.05);
+            border-left: 4px solid var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        .info-panel {
+            margin-top: auto;
+            padding: 20px;
+            background-color: rgba(0,0,0,0.2);
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* 2. Desain Konten Utama & Header */
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background-color: var(--primary-bg);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .header p {
+            margin: 5px 0 0 0;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* 3. Desain Peta Satelit */
+        #map {
+            flex-grow: 1;
+            width: 100%;
+        }
+
+        /* Modifikasi Tampilan Pop-up Leaflet agar sesuai tema */
+        .leaflet-popup-content-wrapper {
+            background-color: var(--sidebar-bg);
+            color: white;
+            border-radius: 8px;
+        }
+        .leaflet-popup-tip {
+            background-color: var(--sidebar-bg);
+        }
+        
+        .btn-prediksi {
+            background-color: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-weight: bold;
+            width: 100%;
+        }
+        .btn-prediksi:hover {
+            background-color: #00c29b;
+        }
+        /* --- TAMPILAN PANEL DATA HISTORIS --- */
+        #panel-historis {
+            display: none; /* Sembunyikan panel ini secara default */
+            padding: 20px 30px;
+            overflow-y: auto;
+            background-color: var(--primary-bg);
+            height: calc(100vh - 70px); /* Menyesuaikan tinggi di bawah header */
+        }
+
+        .summary-cards {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .card {
+            background-color: var(--sidebar-bg);
+            flex: 1;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .card h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .card p {
+            margin: 0;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--text-color);
+        }
+
+        .chart-historis-container {
+            background-color: var(--sidebar-bg);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+
+        /* Desain Tabel Estetik */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: var(--sidebar-bg);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .data-table th, .data-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .data-table th {
+            background-color: rgba(0,0,0,0.2);
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        .data-table tr:hover {
+            background-color: rgba(255,255,255,0.05);
+        }
+        /* --- TAMPILAN PANEL KINERJA LSTM --- */
+        .grid-kinerja {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .insight-box {
+            background-color: rgba(231, 76, 60, 0.1);
+            border-left: 4px solid #e74c3c;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #dcdde1;
+        }
+
+        .insight-box strong {
+            color: #e74c3c;
+        }
+
+        .arsitektur-list {
+            list-style: none;
+            padding: 0;
+            color: var(--text-muted);
+            line-height: 2;
+        }
+
+        .arsitektur-list li::before {
+            content: "▹";
+            color: var(--accent-color);
+            margin-right: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>BMKG Monitoring</h2>
+        </div>
+        
+        <ul class="sidebar-menu">
+            <li id="menu-peta" class="active">📍 Peta Satelit Utama</li>
+            <li id="menu-historis">📊 Data Historis Harian</li>
+            <li id="menu-kinerja">⚙️ Kinerja Model LSTM</li>
+            <li id="menu-api">📝 Dokumentasi API</li> 
+        </ul>
+        
+        <div class="info-panel">
+            <b>Status Sistem:</b> <span style="color: var(--accent-color);">Online</span><br><br>
+            <i>Model Univariat Harian aktif.<br>Interpolasi Linear berjalan.</i>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="header">
+            <div>
+                <h1>Sistem Prediksi dan Visualisasi Curah Hujan di Sulawesi Selatan</h1>
+                <p>Arsitektur Model: Long Short-Term Memory (LSTM)</p>
+            </div>
+        </header>
+
+        <div id="map"></div>
+        <div id="panel-historis" style="display: none; padding: 20px 30px; overflow-y: auto; background-color: var(--primary-bg); height: calc(100vh - 70px);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <h2 style="color: var(--accent-color); margin: 0;">Data Historis Harian</h2>
+                    <p style="color: var(--text-muted); margin: 5px 0 0 0;">Menampilkan rangkuman data observasi lapangan (Ground Truth).</p>
+                </div>
+                <select id="pilih-stasiun-historis" style="background-color: var(--sidebar-bg); color: white; border: 1px solid var(--accent-color); padding: 8px 15px; border-radius: 4px; cursor: pointer;">
+                    <option value="hasanuddin">Stamet Hasanuddin (Pesisir)</option>
+                    <option value="pongtiku">Stamet Pongtiku (Pegunungan)</option>
+                    <option value="benteng">Benteng / Bontoharu (Kepulauan)</option>
+                </select>
+            </div>
+            
+            <div class="summary-cards">
+                <div class="card"><h3 style="color: var(--text-muted); margin-top:0;">Rata-rata Curah Hujan</h3><p id="hist-rata">8.4 mm</p></div>
+                <div class="card"><h3 style="color: var(--text-muted); margin-top:0;">Curah Hujan Maksimum</h3><p id="hist-max">135.5 mm</p></div>
+                <div class="card"><h3 style="color: var(--text-muted); margin-top:0;">Total Data Valid</h3><p id="hist-total">3.653 Hari</p></div>
+            </div>
+
+            <div class="chart-historis-container" style="background-color: var(--sidebar-bg); padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                <h3 style="margin-top: 0; color: white;">Tren Observasi 30 Hari Terakhir</h3>
+                <canvas id="grafikTrenHistoris" height="80"></canvas>
+            </div>
+        </div>
+
+        <div id="panel-kinerja" style="display: none; padding: 20px 30px; overflow-y: auto; background-color: var(--primary-bg); height: calc(100vh - 70px);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <h2 style="color: var(--accent-color); margin: 0;">Evaluasi Kinerja & Arsitektur LSTM</h2>
+                    <p style="color: var(--text-muted); margin: 5px 0 0 0;">Transparansi performa model pengujian wilayah.</p>
+                </div>
+                <select id="pilih-stasiun-kinerja" style="background-color: var(--sidebar-bg); color: white; border: 1px solid var(--accent-color); padding: 8px 15px; border-radius: 4px; cursor: pointer;">
+                    <option value="hasanuddin">Stamet Hasanuddin (Pesisir)</option>
+                    <option value="pongtiku">Stamet Pongtiku (Pegunungan)</option>
+                    <option value="benteng">Benteng / Bontoharu (Kepulauan)</option>
+                </select>
+            </div>
+            
+            <div class="summary-cards">
+                <div class="card" style="border-left-color: #2ecc71;"><h3 style="color: var(--text-muted); margin-top:0;">Mean Absolute Error (MAE)</h3><p id="metrics-mae">2.14</p></div>
+                <div class="card" style="border-left-color: #f1c40f;"><h3 style="color: var(--text-muted); margin-top:0;">Mean Squared Error (MSE)</h3><p id="metrics-mse">304.58</p></div>
+                <div class="card" style="border-left-color: #e74c3c;"><h3 style="color: var(--text-muted); margin-top:0;">R-Squared (R²)</h3><p id="metrics-r2">-0.0638</p></div>
+            </div>
+
+            <div class="grid-kinerja" style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 20px;">
+                <div class="card" style="border-left: none; background-color: var(--sidebar-bg);">
+                    <h3 style="color: white; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px; margin-top: 0;">Spesifikasi Jaringan</h3>
+                    <ul class="arsitektur-list" style="list-style: none; padding: 0; color: var(--text-muted); line-height: 2;">
+                        <li><b>Look-back Window:</b> 30 Hari</li>
+                        <li><b>Output Proyeksi:</b> 30 Hari Ke Depan</li>
+                        <li><b>Layer 1:</b> LSTM (100 units) + Dropout 0.2</li>
+                        <li><b>Layer 2:</b> LSTM (50 units) + Dropout 0.2</li>
+                        <li><b>Loss Function:</b> Huber Loss</li>
+                        <li><b>Optimizer:</b> Adam</li>
+                        <li><b>Early Stopping:</b> Aktif</li>
+                    </ul>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div class="card" style="border-left: none; background-color: var(--sidebar-bg); padding: 15px;">
+                        <h3 style="color: white; margin-top: 0; font-size: 14px;">Kurva Pembelajaran & Hasil Evaluasi Pengujian</h3>
+                        <div style="display: flex; gap: 15px; margin-top: 10px;">
+                            <div style="flex: 1; background: rgba(0,0,0,0.2); height: 180px; display: flex; align-items: center; justify-content: center; border-radius: 4px; overflow: hidden;">
+                                <img id="img-loss" src="/static/loss_hasanuddin.png" alt="Loss Curve" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                            </div>
+                            <div style="flex: 1; background: rgba(0,0,0,0.2); height: 180px; display: flex; align-items: center; justify-content: center; border-radius: 4px; overflow: hidden;">
+                                <img id="img-eval" src="/static/eval_hasanuddin.png" alt="Prediction Testing" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-api" style="display: none; padding: 20px 30px; overflow-y: auto; background-color: var(--primary-bg); height: calc(100vh - 70px);">
+            <h2 style="color: var(--accent-color); margin-top: 0;">Dokumentasi API Sistem</h2>
+            <p style="color: var(--text-muted); margin-bottom: 25px;">Antarmuka pemrograman aplikasi (REST API) yang menyediakan layanan akses model prediktif secara stateless.</p>
+            
+            <div class="card" style="border-left: none; background-color: var(--sidebar-bg); margin-bottom: 20px;">
+                <h3 style="color: white; margin-top: 0;"><span style="background-color: #2ecc71; color: black; padding: 3px 8px; border-radius: 3px; font-size: 12px; margin-right: 10px;">GET</span> /api/prediksi/&lt;nama_stasiun&gt;</h3>
+                <p style="color: var(--text-muted); font-size: 14px;">Mengambil hasil komputasi prediksi curah hujan 30 hari ke depan (H+1 s.d H+30).</p>
+                <h4 style="color: white; margin-bottom: 5px;">Parameter URL:</h4>
+                <code style="color: var(--accent-color); display: block; margin-bottom: 15px;">nama_stasiun (string) : hasanuddin | pongtiku | benteng</code>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ==========================================
+        // 1. DEKLARASI NAVIGASI SIDEBAR MULTI-PANEL
+        // ==========================================
+        var menuPeta = document.getElementById('menu-peta');
+        var menuHistoris = document.getElementById('menu-historis');
+        var menuKinerja = document.getElementById('menu-kinerja');
+        var menuApi = document.getElementById('menu-api'); 
+
+        var containerPeta = document.getElementById('map');
+        var containerHistoris = document.getElementById('panel-historis');
+        var containerKinerja = document.getElementById('panel-kinerja');
+        var containerApi = document.getElementById('panel-api');
+
+        function resetSemuaPanel() {
+            [menuPeta, menuHistoris, menuKinerja, menuApi].forEach(m => m?.classList.remove('active'));
+            [containerPeta, containerHistoris, containerKinerja, containerApi].forEach(c => { if(c) c.style.display = 'none'; });
+        }
+
+        menuPeta.addEventListener('click', function() { resetSemuaPanel(); menuPeta.classList.add('active'); containerPeta.style.display = 'block'; map.invalidateSize(); });
+        menuHistoris.addEventListener('click', function() { resetSemuaPanel(); menuHistoris.classList.add('active'); containerHistoris.style.display = 'block'; updateDataHistoris(); });
+        menuKinerja.addEventListener('click', function() { resetSemuaPanel(); menuKinerja.classList.add('active'); containerKinerja.style.display = 'block'; updateDataKinerja(); });
+        menuApi.addEventListener('click', function() { resetSemuaPanel(); menuApi.classList.add('active'); containerApi.style.display = 'block'; });
+
+        // ==========================================
+        // 2. INISIALISASI PETA & 3 STASIUN
+        // ==========================================
+        var map = L.map('map').setView([-4.5, 119.5], 7); // Titik tengah Sulawesi Selatan
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        var dataStasiunMap = [
+            { id: 'hasanuddin', nama: 'Stamet Hasanuddin', topo: 'Pesisir / Dataran Rendah', lat: -5.0615, lng: 119.5540 },
+            { id: 'pongtiku', nama: 'Stamet Pongtiku Tana Toraja', topo: 'Pegunungan', lat: -3.0531, lng: 119.8235 },
+            { id: 'benteng', nama: 'Benteng / Bontoharu', topo: 'Kepulauan', lat: -6.1627, lng: 120.4632 }
+        ];
+
+        var chartPrediksiInstances = {}; // Menyimpan instance grafik agar tidak menumpuk
+
+        dataStasiunMap.forEach(st => {
+            var marker = L.marker([st.lat, st.lng]).addTo(map);
+            var popupContent = `
+                <div style="width: 320px; text-align: center;">
+                    <h3 style="margin: 0 0 5px 0; color: #00f2c3;">${st.nama}</h3>
+                    <p style="margin: 0; font-size: 12px; color: #9a9a9a;">Topografi: ${st.topo}</p>
+                    <button class="btn-prediksi" id="btn-${st.id}" onclick="loadPrediksiGrafik('${st.id}')">▶ Prediksi Kedepan</button>
+                    <div style="background: white; border-radius: 4px; margin-top: 15px; padding: 5px;">
+                        <canvas id="grafikPrediksi-${st.id}" width="300" height="150" style="display:none;"></canvas>
+                    </div>
+                </div>
+            `;
+            marker.bindPopup(popupContent);
+        });
+
+        
+        function loadPrediksiGrafik(idStasiun) {
+            var btn = document.getElementById(`btn-${idStasiun}`);
+            btn.innerHTML = 'Memproses Data...';
+            btn.style.backgroundColor = '#f1c40f';
+
+            fetch(`/api/prediksi/${idStasiun}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'error') {
+                        throw new Error(data.message);
+                    }
+
+                    // 1. Munculkan kotak canvas-nya terlebih dahulu
+                    var canvas = document.getElementById(`grafikPrediksi-${idStasiun}`);
+                    canvas.style.display = 'block';
+                    
+                    // 2. Tahan eksekusi selama 100 milidetik agar Leaflet sempat membuat ruang popup
+                    setTimeout(() => {
+                        var ctx = canvas.getContext('2d');
+                        
+                        if (chartPrediksiInstances[idStasiun]) { 
+                            chartPrediksiInstances[idStasiun].destroy(); 
+                        }
+                        
+                        var labelHari = Array.from({length: data.prediksi.length}, (_, i) => `H+${i+1}`);
+
+                        chartPrediksiInstances[idStasiun] = new Chart(ctx, {
+                            type: 'line', 
+                            data: {
+                                labels: labelHari, 
+                                datasets: [{
+                                    label: 'Prediksi Curah Hujan (mm)',
+                                    data: data.prediksi,
+                                    backgroundColor: 'rgba(52, 152, 219, 0.2)',
+                                    borderColor: 'rgba(52, 152, 219, 1)',
+                                    borderWidth: 2,
+                                    fill: true,
+                                    tension: 0.3,
+                                    pointRadius: 2
+                                }]
+                            },
+                            options: { 
+                                responsive: true,
+                                maintainAspectRatio: false, // Wajib ada agar grafik menyesuaikan ukuran popup peta
+                                scales: { y: { beginAtZero: true } }, 
+                                plugins: { legend: { display: false } } 
+                            }
+                        });
+
+                        // 3. Ubah tombol menjadi sukses
+                        btn.innerHTML = '✔ Simulasi Selesai';
+                        btn.style.backgroundColor = '#00f2c3';
+                    }, 100); // 100 ms jeda
+
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert("Gagal memproses: " + error.message);
+                    btn.innerHTML = '❌ Terjadi Kesalahan';
+                    btn.style.backgroundColor = '#e74c3c';
+                });
+        }
+
+        // ==========================================
+        // 3. LOGIKA DATA HISTORIS & KINERJA LSTM
+        // ==========================================
+        var databaseStasiun = {
+            hasanuddin: { 
+                rata: "8.4 mm", max: "135.5 mm", total: "3.653 Hari", 
+                mae: "2.14", mse: "304.58", r2: "-0.0638", 
+                data: [0,0,15,40,2,0,0,0,120,45,0,0,8,20,0,12,0,5,30,12,0,0,0,4,18,0,0,0,2,11] 
+            },
+            pongtiku: { 
+                rata: "11.2 mm", max: "189.2 mm", total: "3.651 Hari", 
+                mae: "2.84", mse: "412.15", r2: "-0.0521", 
+                data: [5,12,0,0,22,45,12,0,0,0,65,90,10,0,4,0,0,32,15,0,0,8,19,4,0,0,55,12,0,0] 
+            },
+            benteng: { 
+                rata: "6.1 mm", max: "210.4 mm", total: "3.648 Hari", 
+                mae: "1.92", mse: "289.41", r2: "-0.0812", 
+                data: [0,0,0,5,10,0,0,80,140,25,0,0,0,0,2,8,14,0,0,0,0,11,40,5,0,0,0,0,0,1] 
+            }
+        };
+
+        var chartHistoris = null;
+        var selectorHistoris = document.getElementById('pilih-stasiun-historis');
+        selectorHistoris.addEventListener('change', updateDataHistoris);
+
+        function updateDataHistoris() {
+            var stasiunKey = selectorHistoris.value;
+            var info = databaseStasiun[stasiunKey];
+
+            document.getElementById('hist-rata').innerText = info.rata;
+            document.getElementById('hist-max').innerText = info.max;
+            document.getElementById('hist-total').innerText = info.total;
+
+            var ctx = document.getElementById('grafikTrenHistoris').getContext('2d');
+            if (chartHistoris) { chartHistoris.destroy(); }
+
+            var labels30Hari = Array.from({length: 30}, (_, i) => `H-${30 - i}`);
+            labels30Hari[29] = "Hari Ini";
+
+            chartHistoris = new Chart(ctx, {
+                type: 'line', // Line Chart untuk Data Historis
+                data: {
+                    labels: labels30Hari,
+                    datasets: [{
+                        label: 'Observasi Curah Hujan (mm)',
+                        data: info.data,
+                        borderColor: '#00f2c3',
+                        backgroundColor: 'rgba(0, 242, 195, 0.05)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 2
+                    }]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+        var selectorKinerja = document.getElementById('pilih-stasiun-kinerja');
+        selectorKinerja.addEventListener('change', updateDataKinerja);
+
+        function updateDataKinerja() {
+            var stasiunKey = selectorKinerja.value;
+            var info = databaseStasiun[stasiunKey];
+
+            document.getElementById('metrics-mae').innerText = info.mae;
+            document.getElementById('metrics-mse').innerText = info.mse;
+            document.getElementById('metrics-r2').innerText = info.r2;
+
+            document.getElementById('img-loss').src = `/static/loss_${stasiunKey}.png`;
+            document.getElementById('img-eval').src = `/static/eval_${stasiunKey}.png`;
+        }
+    </script>
+</body>
+</html>
